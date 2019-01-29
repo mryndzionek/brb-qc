@@ -56,15 +56,13 @@ data MixedOperations = MixedOperations
 
 instance Arbitrary MixedOperations where
   arbitrary = do
-    preCount <- choose range
-    oCount <- choose range
+    preCount <- growingElements [10 .. 1000]
+    oCount <- growingElements [10 .. 1000]
     pre <- gOffers preCount
     post <- gPolls oCount
     offers <- gOffers oCount
     polls <- gPolls preCount
     return $ MixedOperations pre offers polls post
-    where
-      range = (10, 1000)
   shrink mixed =
     let pre = _pre mixed
         off = _offers mixed

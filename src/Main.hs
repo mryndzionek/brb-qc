@@ -9,11 +9,12 @@ import           Tests
 prop_trackingUsedSpace =
   monadicIO $ do
     run $ c_setUp 1000
-    s <- run $ generate (vectorOf 100 $ choose (0, 255)) >>= offer
-    assert $ s == 100
-    _ <- run $ poll 50
+    l <- run $ generate $ choose (10, 1000)
+    s <- run $ generate (vectorOf l $ choose (0, 255)) >>= offer
+    assert $ s == fromIntegral l
+    _ <- run $ poll (fromIntegral s `div` 2)
     s' <- run used
-    assert $ s' == 50
+    assert $ s' == (fromIntegral l - fromIntegral s `div` 2)
     run c_tearDown
 
 prop_offerThenPoll (OfferThenPoll cs ops) =
