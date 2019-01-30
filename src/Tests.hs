@@ -1,9 +1,8 @@
 module Tests where
 
-import           Data.Function
-import           Data.List.Split
-import           Foreign.C.Types
-import           Test.QuickCheck
+import Data.List.Split
+import Foreign.C.Types
+import Test.QuickCheck
 
 type Offer = [CUChar]
 
@@ -42,39 +41,45 @@ getOffers = concatMap strip
     strip (Oo o) = o
     strip (Op _) = []
 
-getOps :: MixedOperations -> IO [Operation]
-getOps mixed = do
-  ops <- generate $ shuffle $ map Oo (_offers mixed) ++ map Op (_polls mixed)
-  return $ map Oo (_pre mixed) ++ ops ++ map Op (_post mixed)
+getOps :: [Offer] -> [Offer] -> [Poll] -> [Poll] -> Gen [Operation]
+getOps pre offers polls post = do
+  ops <- shuffle $ map Oo offers ++ map Op polls
+  return $ map Oo pre ++ ops ++ map Op post
+
+mkMixedOperations :: Int -> Int -> Gen MixedOperations
+mkMixedOperations preC offersC = do
+  pre <- gOffers preC
+  post <- gPolls offersC
+  offers <- gOffers offersC
+  polls <- gPolls preC
+  ops <- getOps pre offers polls post
+  return $
+    MixedOperations
+      (length pre)
+      (length offers + length polls)
+      (length post)
+      ops
 
 data MixedOperations = MixedOperations
-  { _pre    :: [Offer]
-  , _offers :: [Offer]
-  , _polls  :: [Poll]
-  , _post   :: [Poll]
+  { _pre :: Int
+  , _mid :: Int
+  , _post :: Int
+  , _ops :: [Operation]
   } deriving (Show)
 
 instance Arbitrary MixedOperations where
-  arbitrary = do
-    preCount <- growingElements [10 .. 1000]
-    oCount <- growingElements [10 .. 1000]
-    pre <- gOffers preCount
-    post <- gPolls oCount
-    offers <- gOffers oCount
-    polls <- gPolls preCount
-    return $ MixedOperations pre offers polls post
+  arbitrary = sized $ \n -> do
+    let (s, e) = (1, n + 1)
+    preCount <- choose (s, e)
+    oCount <- choose (s, e)
+    mkMixedOperations preCount oCount
   shrink mixed =
-    let pre = _pre mixed
-        off = _offers mixed
-        pol = _polls mixed
-        pos = _post mixed
-        nulls m =
-          not . or $
-          fmap (m &) [null . _pre, null . _offers, null . _polls, null . _post]
+    let (pr, mid, po) = (_pre mixed, _mid mixed, _post mixed)
+        (pr':mid':po') = splitPlaces [pr, mid, po] $ _ops mixed
+        crit m = _pre m > 0 && _mid m > 0 && _post m > 0
      in filter
-          nulls
-          [ MixedOperations (init pre) off pol pos
-          , MixedOperations pre (init off) pol pos
-          , MixedOperations pre off (init pol) pos
-          , MixedOperations pre off pol (init pos)
+          crit
+          [ MixedOperations (pr - 1) mid po (init pr' ++ mid' ++ head po')
+          , MixedOperations pr (mid - 1) po (pr' ++ init mid' ++ head po')
+          , MixedOperations pr mid (po - 1) (pr' ++ mid' ++ (init . head) po')
           ]

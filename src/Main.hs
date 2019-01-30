@@ -26,11 +26,10 @@ prop_offerThenPoll (OfferThenPoll cs ops) =
 
 prop_generalCorrectTest mixed =
   monadicIO $ do
-    ops <- run $ getOps mixed
-    let offs = getOffers ops
+    let offs = getOffers $ _ops mixed
         len = fromIntegral $ length offs
     run $ c_setUp len
-    out <- run $ transaction ops
+    out <- run $ transaction $ _ops mixed
     assert $ out == offs
     len' <- run used
     assert $ len' == 0
